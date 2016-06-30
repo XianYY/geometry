@@ -1,5 +1,6 @@
 package sample;
 
+import algo.*;
 import javafx.fxml.FXML;
 import javafx.geometry.Point2D;
 import javafx.scene.canvas.Canvas;
@@ -23,6 +24,8 @@ public class Controller {
     private Canvas canvas;
     
     private List<Point2D> line = new ArrayList<Point2D>();
+
+    private boolean debugEnable = false;
             
 
     public void setCanvas(Canvas canvas) {
@@ -38,11 +41,11 @@ public class Controller {
             clearCanvas();
             drawLine(this.line, Color.BLACK);
 
-            List<Point2D> offsetLine = offset(offset);
-            drawLine(offsetLine, Color.BLUE);
+            Segments segs = offset(offset);
+            drawSegments(segs, Color.BLUE);
 
-            List<Point2D> circleAssistLine = rollThrough(this.line, offset);
-            drawLine(circleAssistLine, Color.RED);
+//            List<Point2D> circleAssistLine = rollThrough(this.line, offset);
+//            drawLine(circleAssistLine, Color.RED);
 
         } catch (NumberFormatException e) {
             Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -80,6 +83,14 @@ public class Controller {
         }
     }
 
+    private void drawSegments(Segments segs, Paint paint) {
+        GraphicsContext gc = this.canvas.getGraphicsContext2D();
+        gc.save();
+        gc.setStroke(paint);
+        segs.draw(gc);
+        gc.restore();
+    }
+
     private void drawLine(List<Point2D> line, Paint paint) {
         if (line.size() < 2) {
             return;
@@ -97,18 +108,40 @@ public class Controller {
         gc.restore();
     }
 
-    private List<Point2D> offset(double offset) {
-        List<Point2D> newLine = new ArrayList<Point2D>();
-        Point2D p1 = null;
-        for (Point2D p : this.line) {
-            if (p1 != null) {
-                newLine.addAll(offsetLineSeg(p1, p, offset));
+    private Segments offset(double offset) {
+        LineDeviator1 deviator = new LineDeviator1();
+        deviator.setDebuger(new LineDeviator1.Debuger() {
+
+            @Override
+            public void debug(Point2D point) {
+                if (!debugEnable) {
+                    return;
+                }
+                GraphicsContext gc = Controller.this.canvas.getGraphicsContext2D();
+                gc.save();
+                gc.setStroke(Color.ORANGE);
+                gc.fillOval(point.getX()-2, point.getY()-2, 4, 4);
+                gc.restore();
             }
-            p1 = p;
-        }
-        return newLine;
+
+            @Override
+            public void debug(Drawable drawable) {
+                if (!debugEnable) {
+                    return;
+                }
+                GraphicsContext gc = Controller.this.canvas.getGraphicsContext2D();
+                gc.save();
+                gc.setStroke(Color.ORANGE);
+                drawable.draw(gc);
+                gc.restore();
+            }
+        });
+        Segments segs = Segments.fromLine(line);
+        return deviator.offset(segs, offset);
     }
 
+    //TODO: remove
+    @Deprecated
     private List<Point2D> offsetLineSeg(Point2D p1, Point2D p2, double offset) {
         double d = Math.sqrt(Math.pow(p1.getX() - p2.getX(), 2) + Math.pow(p1.getY() - p2.getY(), 2));
         double dx = offset * (p1.getY() - p2.getY()) / d;
@@ -148,272 +181,6 @@ public class Controller {
             }
         }
         return newLine;
-    }
-
-    interface Intersectable {
-        List<Point2D> intersect(Intersectable other);
-        void draw(GraphicsContext gc);
-    }
-
-    public static boolean isZero(double value) {
-        return Math.abs(value) < 1E-6;
-    }
-
-    static class Line implements Intersectable {
-        // ax + by + c = 0 (b = 0 or 1)
-        private Point2D p1;
-        private Point2D p2;
-
-        public Line(Point2D p1, Point2D p2) {
-            this.p1 = p1;
-            this.p2 = p2;
-        }
-
-        public Line(List<Point2D> points) {
-            this.p1 = points.get(0);
-            this.p2 = points.get(1);
-        }
-
-        public boolean isPerpendicular() {
-            return Math.abs(p1.getX() - p2.getX()) < 1E-6;
-        }
-
-        public boolean isHorizontal() {
-            return Math.abs(p1.getY() - p2.getY()) < 1E-6;
-        }
-
-        private double getA() {
-            if (isPerpendicular()) {
-                return 1;
-            } else {
-                return (p2.getY() - p1.getY()) / (p1.getX() - p2.getX());
-            }
-        }
-
-        private double getB() {
-            return isPerpendicular() ? 0 : 1;
-        }
-
-        private double getC() {
-            if (isPerpendicular()) {
-                return -p1.getX();
-            } else {
-                return (p2.getX()*p1.getY() - p1.getX()*p2.getY()) / (p1.getX() - p2.getX());
-            }
-        }
-
-        @Override
-        public List<Point2D> intersect(Intersectable other) {
-            List<Point2D> points = new ArrayList<Point2D>();
-            if (other instanceof Line) {
-                Line otherLine = (Line) other;
-                Point2D point = intersect(this, otherLine);
-                if (point != null) {
-                    points.add(point);
-                }
-            } else if (other instanceof LineSeg) {
-                LineSeg seg = (LineSeg) other;
-                Point2D point = intersect(this, seg.toLine());
-                if (point != null && seg.contains(point)) {
-                    points.add(point);
-                }
-            } else if (other instanceof Circle) {
-                Circle circle = (Circle) other;
-                double a = getA();
-                double b = getB();
-                double c = getC();
-                double x1 = circle.center.getX();
-                double y1 = circle.center.getY();
-                double r = circle.radius;
-                if (isZero(b)) {
-                    double x = -c/a;
-                    double d = Math.abs(x - x1);
-                    if (isZero(d)) {
-                        points.add(new Point2D(x, y1));
-                    } else if (d < r) {
-                        double delta = r*r - d*d;
-                        points.add(new Point2D(x, y1 - Math.sqrt(delta)));
-                        points.add(new Point2D(x, y1 + Math.sqrt(delta)));
-                    }
-                } else if (isZero(a)) {
-                    double y = -c/b;
-                    double d = Math.abs(y - y1);
-                    if (isZero(d)) {
-                        points.add(new Point2D(x1, y));
-                    } else if (d < r) {
-                        double delta = r*r - d*d;
-                        points.add(new Point2D(x1 - Math.sqrt(delta), y));
-                        points.add(new Point2D(x1 + Math.sqrt(delta), y));
-                    }
-                } else {
-                    double na = 1 + a*a;
-                    double nb = 2 * (a*c + a*y1 - x1);
-                    double nc = x1*x1 + Math.pow(c+y1, 2) - r*r;
-                    double delta = nb * nb - 4 * na * nc;
-                    if (isZero(delta)) {
-                        double x = -0.5*nb/na;
-                        points.add(new Point2D(x, -a*x-c));
-                    } else if (delta > 0) {
-                        double sqrtDelta = Math.sqrt(delta);
-                        double x = 0.5 * (-nb - sqrtDelta)/na;
-                        points.add(new Point2D(x, -a*x-c));
-                        x = 0.5 * (-nb + sqrtDelta)/na;
-                        points.add(new Point2D(x, -a*x-c));
-                    }
-                }
-            } else {
-                throw new UnsupportedOperationException();
-            }
-            return points;
-        }
-
-        @Override
-        public void draw(GraphicsContext gc) {
-            gc.save();
-            gc.setStroke(Color.GREEN);
-            gc.strokeLine(p1.getX(), p1.getY(), p2.getX(), p2.getY());
-            gc.restore();
-        }
-
-        public Point2D findPerpendicularPoint(Point2D point) {
-            if (isPerpendicular()) {
-                return new Point2D(p1.getX(), point.getY());
-            } else if (isHorizontal()) {
-                return new Point2D(point.getX(), p1.getY());
-            } else {
-                double kPer = (p1.getX() - p2.getX()) / (p2.getY() - p1.getY());
-                Line line = new Line(point, new Point2D(0, point.getY() - kPer*point.getX()));
-                List<Point2D> intersects = intersect(line);
-                assert intersects.size() == 1;
-                return intersects.get(0);
-            }
-        }
-
-        public static Point2D intersect(Line line1, Line line2) {
-            double a1 = line1.getA();
-            double b1 = line1.getB();
-            double c1 = line1.getC();
-            double a2 = line2.getA();
-            double b2 = line2.getB();
-            double c2 = line2.getC();
-            if (Math.abs(a1 - a2) < 1E-6) {
-                return null;
-            }
-            double div = a2*b1 - a1*b2;
-            assert Math.abs(div) > 1E-6;
-            double x = (b2*c1 - b1*c2)/div;
-            double y = 0;
-//            if (isZero(a2)) {
-                y = (a1*c2 - a2*c1)/div;
-//            } else {
-//                x = (a2*b2*c1 - a2*b1*c2)/(a2*div);
-//            }
-            return new Point2D(x, y);
-        }
-    }
-
-
-    static class LineSeg implements Intersectable {
-        private Point2D p1;
-        private Point2D p2;
-        public LineSeg(Point2D p1, Point2D p2) {
-            this.p1 = p1;
-            this.p2 = p2;
-        }
-
-        public Line toLine() {
-            return new Line(p1, p2);
-        }
-
-        public boolean contains(Point2D point) {
-            double t = 0;
-            if (toLine().isPerpendicular()) {
-                t = (point.getX() - p1.getX()) / (p2.getX() - p1.getX());
-            } else {
-                t = (point.getY() - p1.getY()) / (p2.getY() - p1.getY());
-            }
-            return t >= -1E-6 && t <= 1 + 1E-6;
-        }
-
-        @Override
-        public List<Point2D> intersect(Intersectable other) {
-            if (other instanceof Circle) {
-                Line line = new Line(p1, p2);
-                List<Point2D> intersects = line.intersect(other);
-                List<Point2D> validIntersects = new ArrayList<Point2D>();
-                for (Point2D p : intersects) {
-                    if (contains(p)) {
-                        validIntersects.add(p);
-                    }
-                }
-                return validIntersects;
-            }
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void draw(GraphicsContext gc) {
-            gc.save();
-            gc.strokeLine(p1.getX(), p1.getY(), p2.getX(), p2.getY());
-            gc.restore();
-        }
-    }
-
-    static class Circle implements Intersectable {
-        Point2D center;
-        double radius;
-        public Circle(Point2D center, double radius) {
-            this.center = center;
-            this.radius = radius;
-        }
-
-        @Override
-        public List<Point2D> intersect(Intersectable other) {
-            List<Point2D> points = new ArrayList<Point2D>();
-            if (other instanceof Line) {
-                return ((Line) other).intersect(this);
-            } else if (other instanceof Circle) {
-                Circle circle = (Circle) other;
-                assert circle.radius == radius;
-                double dd = Math.pow(center.getX() - circle.center.getX(), 2) + Math.pow(center.getY() - circle.center.getY(), 2);
-                if (isZero(dd - Math.pow(radius + circle.radius, 2))) {
-                    points.add(new Point2D(0.5 * (center.getX() + circle.center.getX()), 0.5 * (center.getY() + circle.center.getY())));
-                } else if (dd < Math.pow(radius + circle.radius, 2) + 1E-6) {
-                    double x1 = center.getX();
-                    double y1 = center.getY();
-                    double x2 = circle.center.getX();
-                    double y2 = circle.center.getY();
-                    double r = radius;
-                    if (isZero(y2 - y1)) {
-                        double yd = Math.sqrt(r * r - 0.25 * dd);
-                        points.add(new Point2D(0.5 * (x1 + x2), y1 - yd));
-                        points.add(new Point2D(0.5 * (x1 + x2), y1 + yd));
-                    } else if (isZero(x2 - x1)) {
-                        double xd = Math.sqrt(r * r - 0.25 * dd);
-                        points.add(new Point2D(x1 - xd, 0.5 * (y1 + y2)));
-                        points.add(new Point2D(x1 + xd, 0.5 * (y1 + y2)));
-                    } else {
-                        double k = (x1 - x2) / (y2 - y1);
-                        double lx = 0.5 * (x1 + x2);
-                        double ly = 0.5 * (y1 + y2);
-                        Line line = new Line(new Point2D(lx, ly), new Point2D(0, ly - k * lx));
-                        points.addAll(line.intersect(this));
-                    }
-                }
-            } else if (other instanceof LineSeg) {
-                return ((LineSeg) other).intersect(this);
-            } else {
-                throw new UnsupportedOperationException();
-            }
-            return points;
-        }
-
-        @Override
-        public void draw(GraphicsContext gc) {
-            gc.save();
-            gc.strokeOval(center.getX() - radius, center.getY() - radius, 2*radius, 2*radius);
-            gc.restore();
-        }
     }
 
 
@@ -463,7 +230,7 @@ public class Controller {
 //                gc.strokeOval(inter.getX() - offset, inter.getY() - offset, 2*offset, 2*offset);
                 if (validOutCircleCenter(inter, offset, seg1, seg2)) {
                     gc.strokeOval(p3.getX() - offset, p3.getY() - offset, 2*offset, 2*offset);
-                    gc.strokeLine(line.p1.getX(), line.p1.getY(), line.p2.getX(), line.p2.getY());
+                    gc.strokeLine(line.getX1(), line.getY1(), line.getX2(), line.getY2());
                     return inter;
                 }
             }
@@ -480,7 +247,7 @@ public class Controller {
 //                gc.strokeOval(inter.getX() - offset, inter.getY() - offset, 2*offset, 2*offset);
                 if (validOutCircleCenter(inter, offset, seg1, seg2)) {
                     gc.strokeOval(p1.getX() - offset, p1.getY() - offset, 2*offset, 2*offset);
-                    gc.strokeLine(line.p1.getX(), line.p1.getY(), line.p2.getX(), line.p2.getY());
+                    gc.strokeLine(line.getX1(), line.getY1(), line.getX2(), line.getY2());
                     return inter;
                 }
             }
