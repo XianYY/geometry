@@ -53,6 +53,7 @@ public class Util {
 
     public static double getAngle(double x, double y) {
         System.out.println(String.format("XY  %f, %f", x, y));
+        y = -y;
         if (isZero(x)) {
             return y > 0 ? 90 : 270;
         } else {
@@ -69,5 +70,25 @@ public class Util {
                 return degree;
             }
         }
+    }
+
+    public static double distance(Point2D p1, Point2D p2) {
+        return Math.sqrt(Math.pow(p2.getX() - p1.getX(), 2) + Math.pow(p2.getY() - p1.getY(), 2));
+    }
+
+    public static Point2D findFarest(Point2D point, List<Point2D> points) {
+        double maxD = 0;
+        Point2D farest = null;
+        for (Point2D p : points) {
+            if (farest == null) {
+                farest = p;
+            }
+            double d = distance(p, point);
+            if (d > maxD) {
+                farest = p;
+                maxD = d;
+            }
+        }
+        return farest;
     }
 }

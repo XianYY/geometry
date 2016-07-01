@@ -25,7 +25,7 @@ public class Controller {
     
     private List<Point2D> line = new ArrayList<Point2D>();
 
-    private boolean debugEnable = false;
+    private boolean debugEnable = true;
             
 
     public void setCanvas(Canvas canvas) {
@@ -133,6 +133,30 @@ public class Controller {
                 gc.save();
                 gc.setStroke(Color.ORANGE);
                 drawable.draw(gc);
+                gc.restore();
+            }
+
+            @Override
+            public void debugLine(Point2D p1, Point2D p2) {
+                if (!debugEnable) {
+                    return;
+                }
+                GraphicsContext gc = Controller.this.canvas.getGraphicsContext2D();
+                gc.save();
+                gc.setStroke(Color.ORANGE);
+                gc.strokeLine(p1.getX(), p1.getY(), p2.getX(), p2.getY());
+                gc.restore();
+            }
+
+            @Override
+            public void debugCircle(Point2D center, double radius) {
+                if (!debugEnable) {
+                    return;
+                }
+                GraphicsContext gc = Controller.this.canvas.getGraphicsContext2D();
+                gc.save();
+                gc.setStroke(Color.ORANGE);
+                gc.strokeOval(center.getX() - radius, center.getY() - radius, 2*radius, 2*radius);
                 gc.restore();
             }
         });

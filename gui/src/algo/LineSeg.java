@@ -24,10 +24,16 @@ public class LineSeg extends Segment implements Intersectable {
         }
     }
 
+    @Override
+    public Segment cutOffTail(Point2D cutPoint) {
+        return new LineSeg(p1, cutPoint);
+    }
+
     public Line toLine() {
         return new Line(p1, p2);
     }
 
+    @Override
     public boolean contains(Point2D point) {
         double t = 0;
         if (toLine().isPerpendicular()) {

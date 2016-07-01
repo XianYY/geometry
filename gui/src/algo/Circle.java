@@ -52,6 +52,15 @@ public class Circle implements Intersectable {
             }
         } else if (other instanceof LineSeg) {
             return ((LineSeg) other).intersect(this);
+        } else if (other instanceof Arc) {
+            Arc arc = (Arc) other;
+            List<Point2D> intersects = new ArrayList<Point2D>();
+            for (Point2D inter : arc.toCircle().intersect(this)) {
+                if (arc.contains(inter)) {
+                    intersects.add(inter);
+                }
+            }
+            return intersects;
         } else {
             throw new UnsupportedOperationException();
         }

@@ -1,0 +1,10 @@
+
+*.py
+
+*.pyc
+
+*.class
+
+gui/out/production/gui/sample/sample.fxml
+
+gui/out/production/gui/sample/sample.fxml

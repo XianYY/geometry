@@ -55,4 +55,15 @@ public class Segments implements Drawable {
             return segments.get(segments.size()-1).p2;
         }
     }
+
+    public Segment popLast() {
+        if (segments.isEmpty()) {
+            return null;
+        } else {
+            Segment seg = segments.get(segments.size()-1);
+            points.remove(seg.p2);
+            segments.remove(seg);
+            return seg;
+        }
+    }
 }
